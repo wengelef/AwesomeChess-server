@@ -1,0 +1,5 @@
+{
+	"name":"Awesome Chess (Server)",
+	"description":"Websocket Server for Chess Application",
+	"image":"heroku/java"
+}
