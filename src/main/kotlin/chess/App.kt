@@ -69,7 +69,9 @@ data class Command(val command: String)
 
 fun main(args: Array<String>) {
 
-    embeddedServer(Netty, 8080) {
+    val port = System.getenv("PORT")?.let { value -> Integer.valueOf(value) } ?: 8080
+
+    embeddedServer(Netty, port) {
         install(DefaultHeaders)
 
         install(CallLogging) {
