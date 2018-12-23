@@ -23,6 +23,8 @@ import io.ktor.http.cio.websocket.CloseReason
 import io.ktor.http.cio.websocket.Frame
 import io.ktor.http.cio.websocket.close
 import io.ktor.http.cio.websocket.readText
+import io.ktor.response.respondText
+import io.ktor.routing.get
 import io.ktor.routing.routing
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
@@ -103,6 +105,10 @@ fun main(args: Array<String>) {
         }
 
         routing {
+            get("/.well-known/acme-challenge/YL9FbjF4oNYJhUzyhtOGBa6E3crY7o4dbQnM9v-WhZs") {
+                call.respondText { "YL9FbjF4oNYJhUzyhtOGBa6E3crY7o4dbQnM9v-WhZs.PpswYo40EPBZ5BZZglr5ra_frL74kFv2AtXqD3tTkKs" }
+            }
+
             webSocket("/") {
                 val session = call.sessions.get<GameSession>()
 
