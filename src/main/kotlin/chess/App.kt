@@ -105,9 +105,9 @@ fun main(args: Array<String>) {
         }
 
         routing {
-            get("/.well-known/acme-challenge/YL9FbjF4oNYJhUzyhtOGBa6E3crY7o4dbQnM9v-WhZs") {
+            /*get("/.well-known/acme-challenge/YL9FbjF4oNYJhUzyhtOGBa6E3crY7o4dbQnM9v-WhZs") {
                 call.respondText { "YL9FbjF4oNYJhUzyhtOGBa6E3crY7o4dbQnM9v-WhZs.PpswYo40EPBZ5BZZglr5ra_frL74kFv2AtXqD3tTkKs" }
-            }
+            }*/
 
             webSocket("/") {
                 val session = call.sessions.get<GameSession>()
