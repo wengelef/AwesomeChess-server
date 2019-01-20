@@ -23,8 +23,6 @@ import io.ktor.http.cio.websocket.CloseReason
 import io.ktor.http.cio.websocket.Frame
 import io.ktor.http.cio.websocket.close
 import io.ktor.http.cio.websocket.readText
-import io.ktor.response.respondText
-import io.ktor.routing.get
 import io.ktor.routing.routing
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
@@ -44,23 +42,23 @@ import java.time.Duration
 import java.util.*
 
 object GameModule {
-    fun get() = Kodein.Module("GameModule") {
-        bind<ArrayList<Player>>() with provider { arrayListOf(Player(Team.Black), Player(Team.White)) }
-        bind<Board>() with provider { Board() }
-        bind<Game>() with singleton { Game(instance(), instance()) }
-    }
+  fun get() = Kodein.Module("GameModule") {
+    bind<ArrayList<Player>>() with provider { arrayListOf(Player(Team.Black), Player(Team.White)) }
+    bind<Board>() with provider { Board() }
+    bind<Game>() with singleton { Game(instance(), instance()) }
+  }
 }
 
 object AppModule {
-    fun get() = Kodein.Module("AppModule") {
-        bind<Gson>() with singleton { Gson() }
-        bind<GameServer>() with singleton { GameServerImpl(instance()) }
-    }
+  fun get() = Kodein.Module("AppModule") {
+    bind<Gson>() with singleton { Gson() }
+    bind<GameServer>() with singleton { GameServerImpl(instance()) }
+  }
 }
 
 val kodein = Kodein {
-    import(GameModule.get())
-    import(AppModule.get())
+  import(GameModule.get())
+  import(AppModule.get())
 }
 
 val game: Game by kodein.instance()
@@ -71,94 +69,94 @@ data class Command(val command: String)
 
 fun main(args: Array<String>) {
 
-    val port = System.getenv("PORT")?.let { value -> Integer.valueOf(value) } ?: 8080
+  val port = System.getenv("PORT")?.let { value -> Integer.valueOf(value) } ?: 8080
 
-    embeddedServer(Netty, port) {
-        install(DefaultHeaders)
+  embeddedServer(Netty, port) {
+    install(DefaultHeaders)
 
-        install(CallLogging) {
-            level = Level.INFO
+    install(CallLogging) {
+      level = Level.INFO
+    }
+
+    install(ContentNegotiation) {
+      gson {
+        setPrettyPrinting()
+      }
+    }
+
+    install(WebSockets) {
+      pingPeriod = Duration.ofMinutes(1)
+      timeout = Duration.ofSeconds(15)
+      maxFrameSize = Long.MAX_VALUE
+
+      masking = false
+    }
+
+    install(Sessions) {
+      cookie<GameSession>("Session")
+    }
+
+    intercept(ApplicationCallPipeline.Features) {
+      if (call.sessions.get<GameSession>() == null) {
+        call.sessions.set(GameSession(generateNonce()))
+      }
+    }
+
+    routing {
+      /*get("/.well-known/acme-challenge/YL9FbjF4oNYJhUzyhtOGBa6E3crY7o4dbQnM9v-WhZs") {
+          call.respondText { "YL9FbjF4oNYJhUzyhtOGBa6E3crY7o4dbQnM9v-WhZs.PpswYo40EPBZ5BZZglr5ra_frL74kFv2AtXqD3tTkKs" }
+      }*/
+
+      webSocket("/") {
+        val session = call.sessions.get<GameSession>()
+
+        if (session == null) {
+          close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "No Session"))
+          return@webSocket
         }
 
-        install(ContentNegotiation) {
-            gson {
-                setPrettyPrinting()
-            }
+        server.memberJoin(session.id, this)
+
+        try {
+
+          incoming.mapNotNull { it as? Frame.Text }
+                  .consumeEach { frame ->
+                    val command = try {
+                      gson.fromJson(frame.readText(), Command::class.java)
+                    } catch (exception: JsonSyntaxException) {
+                      Command(frame.readText())
+                    }.command
+
+                    when (command) {
+                      "start" -> {
+                        game.start()
+                        server.sendBoard(game.board)
+                      }
+                      "turn" -> {
+                        game.nextTurn()
+                        server.sendBoard(game.board)
+                        if (game.isOver) {
+                          server.broadcast("${game.winner.get()} won the Game")
+                        }
+                      }
+                      "board" -> server.sendBoard(game.board)
+                      "test" -> {
+                        while (!game.isOver) {
+                          game.nextTurn()
+                          server.sendBoard(game.board)
+                        }
+                        server.broadcast("${game.winner.get()} won the Game")
+                      }
+                      else -> server.sendTo(session.id, "server", "Huh?")
+                    }
+                  }
+        } catch (exception: Exception) {
+          println("Caught Exception : ${exception.printStackTrace()}")
+        } finally {
+          server.memberLeft(session.id, this)
+          close(CloseReason(CloseReason.Codes.NORMAL, "Good Bye."))
         }
-
-        install(WebSockets) {
-            pingPeriod = Duration.ofMinutes(1)
-            timeout = Duration.ofSeconds(15)
-            maxFrameSize = Long.MAX_VALUE
-
-            masking = false
-        }
-
-        install(Sessions) {
-            cookie<GameSession>("Session")
-        }
-
-        intercept(ApplicationCallPipeline.Features) {
-            if (call.sessions.get<GameSession>() == null) {
-                call.sessions.set(GameSession(generateNonce()))
-            }
-        }
-
-        routing {
-            /*get("/.well-known/acme-challenge/YL9FbjF4oNYJhUzyhtOGBa6E3crY7o4dbQnM9v-WhZs") {
-                call.respondText { "YL9FbjF4oNYJhUzyhtOGBa6E3crY7o4dbQnM9v-WhZs.PpswYo40EPBZ5BZZglr5ra_frL74kFv2AtXqD3tTkKs" }
-            }*/
-
-            webSocket("/") {
-                val session = call.sessions.get<GameSession>()
-
-                if (session == null) {
-                    close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "No Session"))
-                    return@webSocket
-                }
-
-                server.memberJoin(session.id, this)
-
-                try {
-
-                    incoming.mapNotNull { it as? Frame.Text }
-                            .consumeEach { frame ->
-                                val command = try {
-                                    gson.fromJson(frame.readText(), Command::class.java)
-                                } catch (exception: JsonSyntaxException) {
-                                    Command(frame.readText())
-                                }.command
-
-                                when (command) {
-                                    "start" -> {
-                                        game.start()
-                                        server.sendBoard(game.board)
-                                    }
-                                    "turn" -> {
-                                        game.nextTurn()
-                                        server.sendBoard(game.board)
-                                        if (game.isOver) {
-                                            server.broadcast("${game.winner.get()} won the Game")
-                                        }
-                                    }
-                                    "board" -> server.sendBoard(game.board)
-                                    "test" -> {
-                                        while (!game.isOver) {
-                                            game.nextTurn()
-                                            server.sendBoard(game.board)
-                                        }
-                                        server.broadcast("${game.winner.get()} won the Game")
-                                    }
-                                    else -> server.sendTo(session.id, "server", "Huh?")
-                                }
-                            }
-                } catch (exception: Exception) {
-                    println("Caught Exception : ${exception.printStackTrace()}")
-                } finally {
-                    server.memberLeft(session.id, this)
-                    close(CloseReason(CloseReason.Codes.NORMAL, "Good Bye."))
-                }
-            }
-        }
-    }.start(true)
+      }
+    }
+  }.start(true)
 }

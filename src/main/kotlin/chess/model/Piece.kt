@@ -3,11 +3,11 @@ package chess.model
 enum class PieceType { King, Queen, Rook, Bishop, Knight, Pawn, None }
 
 sealed class Piece(val type: PieceType) {
-    override fun toString(): String {
-        return javaClass.simpleName
-    }
+  override fun toString(): String {
+    return javaClass.simpleName
+  }
 
-        object None : Piece(PieceType.None)
+  object None : Piece(PieceType.None)
 }
 
 
